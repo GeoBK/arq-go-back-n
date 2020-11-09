@@ -64,9 +64,14 @@ def recvAcks(cs):
         
         lock.acquire()
         latest_ack = seq_number
-        del rto_buffer[seq_number]
-        del rto_timers[seq_number]
-        outstanding_frames -= 1
+        to_be_deleted = []
+        for seq in rto_buffer:
+            if seq <= seq_number:
+                to_be_deleted.append(seq)
+                outstanding_frames -=1 
+        for seq in to_be_deleted:
+            del rto_buffer[seq]
+            del rto_timers[seq]
         lock.release()
         
 
@@ -79,15 +84,10 @@ def timer(cs, server_addr):
                 rto_timers[key] -= 1
             if rto_timers[key] == 0:
                 # print("Timeout, sequence number = ", key)
-                if key < latest_ack:
-                    to_be_deleted.append(key)
-                    
-                else:
-                    cs.sendto(rto_buffer[key], server_addr)
-                    rto_timers[key] = RTO_TIMEOUT
-        for key in to_be_deleted:
-            del rto_buffer[key]
-            del rto_timers[key]
+                for seq in rto_buffer:
+                    cs.sendto(rto_buffer[seq], server_addr)
+                    rto_timers[seq] = RTO_TIMEOUT
+        
 
         lock.release()
         time.sleep(0.01)
